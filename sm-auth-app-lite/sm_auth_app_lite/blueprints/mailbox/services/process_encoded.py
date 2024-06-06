@@ -11,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 def getContentsFromBody(ebd,parse_dict:dict=None):
-        values = []
-        for key in list(parse_dict.keys()):
-            value = re.search(rf'{key}', ebd)
-            values.append((key,value))
+        # values = []
+        # for key in list(parse_dict.keys()):
+        #     value = re.search(rf'{key}', ebd)
+        #     values.append((key,value))
 
-        return values
+        # return values
 
         amount_debtied = re.search(r'Rs.\d*', ebd)
         to_vpa = re.search(r'VPA.+?on', ebd)

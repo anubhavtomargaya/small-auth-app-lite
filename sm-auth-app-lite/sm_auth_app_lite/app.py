@@ -7,10 +7,10 @@ developement. Run this with run.py"
 from flask import Flask,redirect, url_for,render_template,current_app,jsonify
 from flask_cors import CORS,cross_origin
 import logging
-from common import fh
-from blueprints.google_auth import google_auth
-from blueprints.mailbox import gmail_app
-from common.session_manager import *
+from sm_auth_app_lite.common import fh
+from sm_auth_app_lite.blueprints.google_auth import google_auth
+from sm_auth_app_lite.blueprints.mailbox import gmail_app
+from sm_auth_app_lite.common.session_manager import *
 
 logging.basicConfig(level=logging.INFO)  
 EMAIL_LIST = ['alerts@hdfcbank.net']

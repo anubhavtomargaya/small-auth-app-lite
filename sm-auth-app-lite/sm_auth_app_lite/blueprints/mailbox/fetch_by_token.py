@@ -16,7 +16,7 @@ from sm_auth_app_lite.common.session_manager import set_exec_key,get_exec_key,se
 from sm_auth_app_lite.blueprints.mailbox.services.process_encoded import extractBodyFromEncodedData
 from .query import get_query_for_email
 
-from .utils import get_matched_threads, get_messages_data_from_threads
+from .utils import get_matched_threads, get_matched_threads_list, get_messages_data_from_threads
 # from process_encoded import extractBodyFromEncodedData
 from .services.process_raw import extractCodedContentFromRawMessages
 
@@ -77,16 +77,22 @@ class TokenMatchResponse:
         self.messages = messages
         self.query_string = query_string
         self.data = data
+
+class SearchResponse:
+    def __init__(self,
+                 threads:list,
+                 query_string:str,
+                 data:dict=None
+                 ) -> None:
+        
+        self.threads = threads
+        self.query_string = query_string
+        self.data = data
      
 
 
-def fetch_matching_messages(request:TokenFetchRequest):
-    """ starts execution -> sets execution id. 
-      todo: updates job time meta according to meta dict in session key `execid` 
-       builds oauth client and query for the input in request 
-        queries mailbox to get matching threads -> use them to get messages (end user doesnt know about threads)
-
-          """
+def search_messages(request:TokenFetchRequest):
+    """ saves no state anywhere, returns the matching threads for the query as returned by gmail """
     try:
         
         execution_id = get_random_execution_id()
@@ -94,23 +100,13 @@ def fetch_matching_messages(request:TokenFetchRequest):
         exec_start_time = get_now_time_string()
         oauth2_client = get_oauth_client(token=request.token)
         mailbox_query = get_query_for_email(start=request.start,end=request.end,email=request.email)
-        thread_ids = get_matched_threads(mailbox_query,oauth2_client=oauth2_client) #log output 
-        email_msgs_list = get_messages_data_from_threads(thread_ids,oauth2_client=oauth2_client)
-        # set_email_list(email_msgs_list)
-        match_end_time = get_now_time_string()
-        response = TokenMatchResponse(threads=len(thread_ids),
-                                    messages=len(email_msgs_list),
+        thread_list = get_matched_threads_list(mailbox_query,oauth2_client=oauth2_client) #log output 
+
+        response = SearchResponse(threads=thread_list,
                                     query_string=mailbox_query,
                                     data= {"msgs_list":None})
         
-        raw_coded_msgs = extractCodedContentFromRawMessages(email_msgs_list)
-        db_response = insert_raw_transactions(execution_id, raw_coded_msgs)
-        app.logger.info("db res %s", db_response.__dict__)
-        msgs = db_response.existing_msgs
-        msgs.extend(db_response.inserted_msgs)
-        app.logger.info("msgs %s", msgs)
-        set_email_list(msgs)
-        response.data['msgs_list'] = msgs
+       
         return response.__dict__
 
     except RefreshError as re:
@@ -145,6 +141,7 @@ def fetch_matching_messages(request:TokenFetchRequest):
         msgs = db_response.existing_msgs
         msgs.extend(db_response.inserted_msgs)
         app.logger.info("msgs %s", msgs)
+
         set_email_list(msgs)
         response.data['msgs_list'] = msgs
         return response.__dict__

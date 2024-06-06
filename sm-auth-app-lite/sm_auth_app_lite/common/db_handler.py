@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from sm_auth_app_lite.common.db_init import PipelineExecutionMeta, RawTransactions,db,Transactions
-# from sm_auth_app_lite.common.models import MetaEntry
+from sm_auth_app_lite.common.models import MetaEntry
 from dateutil.parser import parse
 from peewee import IntegrityError
 

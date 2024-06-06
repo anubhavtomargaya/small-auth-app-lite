@@ -5,7 +5,7 @@ from google.auth.exceptions import RefreshError
 import requests,json,datetime
 from flask import current_app as app,jsonify,request, url_for, redirect,render_template
 from sm_auth_app_lite.common.session_manager import clear_email_list, get_auth_token, get_email_list, get_exec_key, is_logged_in, set_exec_key,set_next_url
-from sm_auth_app_lite.blueprints.mailbox.fetch_by_token import TokenFetchRequest,fetch_matching_messages, process_raw_messages
+from sm_auth_app_lite.blueprints.mailbox.fetch_by_token import TokenFetchRequest,fetch_matching_messages, process_raw_messages, search_messages
 
 # stats_dict = {
 #         "MAILBOX_THREAD_COUNT" :None,
@@ -55,15 +55,16 @@ def match_emails_for_query():
         rq = TokenFetchRequest(token=token,
                                 start=st,
                                 end=et)
-        
-        return jsonify(fetch_matching_messages(rq))
+        print("searching for messages")
+        print(rq.__dict__)
+        return jsonify(search_messages(rq))
     
     except RefreshError as re:
         app.logger.info('refresh error %s',re)
         return redirect(url_for('google_auth.logout'))
 
 @gmail_app.route('/fetch/',methods=['GET']) 
-def match_emails_for_query():
+def fetch_emails_for_query():
     mthd = request.method 
     args = request.args
     app.logger.info('method: %s',mthd)

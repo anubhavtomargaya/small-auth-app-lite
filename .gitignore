@@ -161,3 +161,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 sm-auth-app-lite/sm_auth_app_lite/common/env.json
+sm-auth-app-lite/pockets.db
+sm-auth-app-lite/pockets.db-shm
+sm-auth-app-lite/pockets.db-wal

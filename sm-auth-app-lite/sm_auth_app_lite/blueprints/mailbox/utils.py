@@ -28,6 +28,28 @@ def get_matched_threads(query,
     except Exception as e:
         app.logger.exception('getting threads failed')
         raise e
+    
+def get_matched_threads_list(query,
+                     maxResults:int=400,
+                     oauth2_client=None):   
+    try:
+        app.logger.info('building credentials... matched threads ')
+
+        if not oauth2_client :
+            raise Exception("No auth client passed ")
+        
+        app.logger.info('auth client recvd success moving forward:, %s ',oauth2_client)
+        threads = oauth2_client.users().threads().list(userId='me',q= query, maxResults=maxResults)
+        thread_list = threads.execute().get('threads',[])
+        # print(threads)
+        MAILBOX_THREAD_COUNT = len(thread_list)
+        # print(thread_list)
+        # print("threads  ")
+        return  thread_list
+
+    except Exception as e:
+        app.logger.exception('getting threads failed')
+        raise e
 
 class Message:
     def __init__(self, id: str, threadId: str,

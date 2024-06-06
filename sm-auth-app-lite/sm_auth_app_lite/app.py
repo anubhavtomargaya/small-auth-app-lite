@@ -9,6 +9,7 @@ from flask_cors import CORS,cross_origin
 import logging
 from common import fh
 from blueprints.google_auth import google_auth
+from blueprints.mailbox import gmail_app
 from common.session_manager import *
 
 logging.basicConfig(level=logging.INFO)  
@@ -27,6 +28,9 @@ def create_app():
 
     app.register_blueprint(google_auth, url_prefix='/google')
     app.logger.info('Flask bp registerd, %s',"/google")
+
+    app.register_blueprint(gmail_app, url_prefix='/api/v1/mailbox')
+    app.logger.info('Flask bp registerd, %s',"/mailbox")
     return app
 
 app = create_app()

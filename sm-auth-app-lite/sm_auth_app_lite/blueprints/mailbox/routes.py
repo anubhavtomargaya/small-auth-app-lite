@@ -28,6 +28,8 @@ def index():
 
 @gmail_app.route('/match/',methods=['GET']) 
 def match_emails_for_query():
+    """ saves no state anywhere, returns the matching threads for the query as returned by gmail """
+
     mthd = request.method 
     args = request.args
     app.logger.info('method: %s',mthd)
@@ -37,7 +39,7 @@ def match_emails_for_query():
 
     ###prcess arguements
     num_days = args.get('num_days') or 3
-    email = args.get('email') or None
+    email = args.get('email') or  'alerts@hdfcbank.net'
     today_ist = datetime.datetime.now()
     app.logger.info("todat %s",today_ist)
     # app.logger.info("rype",type(today_ist))
@@ -47,13 +49,14 @@ def match_emails_for_query():
     app.logger.info('st,et:  %s %s',st,et)
     
     # access mailbox
-    if not is_logged_in():
-        raise HTTPException("User not logged in!")
-
     try:
+        if not is_logged_in():
+            raise HTTPException("User not logged in!")
+
         token = get_auth_token()
         rq = TokenFetchRequest(token=token,
                                 start=st,
+                                email=email,
                                 end=et)
         print("searching for messages")
         print(rq.__dict__)
@@ -74,7 +77,7 @@ def fetch_emails_for_query():
 
     ###prcess arguements
     num_days = args.get('num_days') or 3
-    email = args.get('email') or None
+    email = args.get('email') or  'alerts@hdfcbank.net'
     today_ist = datetime.datetime.now()
     app.logger.info("todat %s",today_ist)
     # app.logger.info("rype",type(today_ist))
@@ -91,7 +94,8 @@ def fetch_emails_for_query():
         token = get_auth_token()
         rq = TokenFetchRequest(token=token,
                                 start=st,
-                                end=et)
+                                end=et,
+                                email=email)
         
         return jsonify(fetch_matching_messages(rq))
     
@@ -106,11 +110,13 @@ def process_email_list():
     email_list = get_email_list()
     if not email_list:
         # return jsonify("No messages in session")
-        raise HTTPException("No emails found in session. First use api/v1/match or POST ids")
+        raise HTTPException("No emails found in session. First use api/v1/fetch or POST ids")
     
     # run process service 
+
+    print("email lst", email_list)
     processed_emails_response = process_raw_messages(email_list)
-    processed_emails_response['session_email_list']= email_list
+    # processed_emails_response['session_email_list']= email_list
     clear_email_list() #clear session vals to denote that no pending emails to process
    
     return jsonify(processed_emails_response)

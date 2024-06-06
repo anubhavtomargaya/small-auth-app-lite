@@ -24,3 +24,54 @@ class MetaEntry:
         self.decoded_message_count =  decoded_message_count
         self.status =  status
         self.user_id =  user_id
+
+
+# dbhandler
+class FetchRawMessageResponse:
+    def __init__(self,
+                 execution_id,
+                 inserted_msgs,
+                 existing_msgs
+                 ) -> None:
+        self.execution_id = execution_id
+        self.inserted_msgs = inserted_msgs
+        self.existing_msgs = existing_msgs
+
+# mailbox
+class MatchResponse:
+    def __init__(self,
+                 threads:int,
+                 messages:int,
+                 query_string:str,
+                 data:dict=None
+                 ) -> None:
+        
+        self.threads = threads
+        self.messages = messages
+        self.query_string = query_string
+        self.data = data
+
+class SearchResponse:
+    def __init__(self,
+                 threads:list,
+                 query_string:str,
+                 data:dict=None
+                 ) -> None:
+        
+        self.threads = threads
+        self.query_string = query_string
+        self.data = data
+     
+
+
+class TokenFetchRequest:
+    def __init__(self,
+                 token,
+                 start,
+                 end,
+                email) -> None:
+        
+        self.token = token
+        self.start = start
+        self.end = end
+        self.email = email

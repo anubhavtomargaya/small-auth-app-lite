@@ -4,39 +4,19 @@ import datetime
 import json
 from flask import jsonify, current_app as app
 from sm_auth_app_lite.common.utils import get_now_time_string, get_random_execution_id
-from sm_auth_app_lite.common.db_handler import insert_execution_metadata, insert_final_transactions,insert_raw_transactions, query_raw_messages
+from sm_auth_app_lite.common.db_handler import  insert_final_transactions,insert_raw_transactions, query_raw_messages
+from sm_auth_app_lite.common.models import  TokenFetchRequest, SearchResponse, MatchResponse
 
 
 from google.auth.exceptions import RefreshError
-
-# from src.common.db_init import PipelineExecutionMeta
 from sm_auth_app_lite.common.utils import get_oauth_client
-# from src.common.models import MetaEntry
+
 from sm_auth_app_lite.common.session_manager import set_exec_key,get_exec_key,set_email_list,get_email_list
 from sm_auth_app_lite.blueprints.mailbox.services.process_encoded import extractBodyFromEncodedData
 from .query import get_query_for_email
 
 from .utils import get_matched_threads, get_matched_threads_list, get_messages_data_from_threads
-# from process_encoded import extractBodyFromEncodedData
 from .services.process_raw import extractCodedContentFromRawMessages
-
-class FetchResponse:
-    def __init__(self,
-                 ) -> None:
-        pass
-
-class TokenFetchRequest:
-    def __init__(self,
-                 token,
-                 start,
-                 end,
-                 email='alerts@hdfcbank.net') -> None:
-        
-        self.token = token
-        self.start = start
-        self.end = end
-        self.email = email
-        
 
 
 def get_mesaages_to_parse(existing_msgs:list,
@@ -59,38 +39,6 @@ def get_mesaages_to_parse(existing_msgs:list,
     return query_raw_messages(proc,column=None)
 
 
-class MatchData:
-    def __init__(self,
-                 messages:list,
-                 threads) -> None:
-        pass
-
-class TokenMatchResponse:
-    def __init__(self,
-                 threads:int,
-                 messages:int,
-                 query_string:str,
-                 data:dict=None
-                 ) -> None:
-        
-        self.threads = threads
-        self.messages = messages
-        self.query_string = query_string
-        self.data = data
-
-class SearchResponse:
-    def __init__(self,
-                 threads:list,
-                 query_string:str,
-                 data:dict=None
-                 ) -> None:
-        
-        self.threads = threads
-        self.query_string = query_string
-        self.data = data
-     
-
-
 def search_messages(request:TokenFetchRequest):
     """ saves no state anywhere, returns the matching threads for the query as returned by gmail """
     try:
@@ -100,11 +48,11 @@ def search_messages(request:TokenFetchRequest):
         exec_start_time = get_now_time_string()
         oauth2_client = get_oauth_client(token=request.token)
         mailbox_query = get_query_for_email(start=request.start,end=request.end,email=request.email)
+        print(mailbox_query)
         thread_list = get_matched_threads_list(mailbox_query,oauth2_client=oauth2_client) #log output 
-
-        response = SearchResponse(threads=thread_list,
+        response = SearchResponse(threads=len(thread_list),
                                     query_string=mailbox_query,
-                                    data= {"msgs_list":None})
+                                    data= {"threads":thread_list})
         
        
         return response.__dict__
@@ -130,7 +78,7 @@ def fetch_matching_messages(request:TokenFetchRequest):
         email_msgs_list = get_messages_data_from_threads(thread_ids,oauth2_client=oauth2_client)
         # set_email_list(email_msgs_list)
         match_end_time = get_now_time_string()
-        response = TokenMatchResponse(threads=len(thread_ids),
+        response = MatchResponse(threads=len(thread_ids),
                                     messages=len(email_msgs_list),
                                     query_string=mailbox_query,
                                     data= {"msgs_list":None})
@@ -160,6 +108,7 @@ def process_raw_messages(email_message_ids:list,
                                                                 include_existing=False)) # pass here: regex mapping 
     app.logger.info("end to_proc %s",get_now_time_string())
     app.logger.info("to_proc %s",to_insert)
+    return to_insert
     if to_insert:
         processed_emails_response = insert_final_transactions(execution_id, to_insert)
         app.logger.info("out_yeild %s",processed_emails_response)

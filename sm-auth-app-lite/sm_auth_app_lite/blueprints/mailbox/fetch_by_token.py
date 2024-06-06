@@ -108,8 +108,8 @@ def process_raw_messages(email_message_ids:list,
                                                                 include_existing=False)) # pass here: regex mapping 
     app.logger.info("end to_proc %s",get_now_time_string())
     app.logger.info("to_proc %s",to_insert)
-    return to_insert
-    if to_insert:
+    return to_insert 
+    if to_insert: # escaping the code to insert and return in a standard way
         processed_emails_response = insert_final_transactions(execution_id, to_insert)
         app.logger.info("out_yeild %s",processed_emails_response)
         return processed_emails_response

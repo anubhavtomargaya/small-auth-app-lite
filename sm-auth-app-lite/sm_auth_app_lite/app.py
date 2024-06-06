@@ -31,6 +31,19 @@ def create_app():
 
     app.register_blueprint(gmail_app, url_prefix='/api/v1/mailbox')
     app.logger.info('Flask bp registerd, %s',"/mailbox")
+    
+    ## added this route for startup help
+    @app.route('/') 
+    def index():
+        sth = """ <p> - /google for google auth, fetching token for user & permissions etc. </br>
+                    - /api/v1/mailbox for gmail api related actions  </br>
+                        - /match -> sends the query to gmail api- returns threads as it is </br>
+                        - /fetch -> processess the matched threads to extract emails (each thread can have multiple emails). </br>
+                                    Emails are in the form base64 encoded html data. </br>
+                        - /process -> takes the encoded emails, turns into html & parses the relevant info using regex.  </br>
+                    Ability to pass custom regex/use GPT to do this job.  </br></p>
+    """
+        return sth
     return app
 
 app = create_app()

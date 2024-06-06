@@ -21,7 +21,8 @@ def login():
 
         
     if is_logged_in():
-        return redirect(url_for('home'))
+        return "Already logged in, proceed to api/v1/mailbox"
+    redirect(url_for('home'))
     current_app.logger.info("RUNNING LOGIN")
     current_app.logger.info('building session')
     session = OAuth2Session(CLIENT_ID, CLIENT_SECRET,

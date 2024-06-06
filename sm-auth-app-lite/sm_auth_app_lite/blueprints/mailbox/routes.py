@@ -23,7 +23,7 @@ def index():
         return redirect(url_for('google_auth.login'))
     else:
         app.logger.info("logged int")
-        return render_template('home.html') ##gmail_app > index.html
+        return "Go to /match to see matching emails for configured email " ##gmail_app > index.html
     
 
 @gmail_app.route('/match/',methods=['GET']) 
@@ -105,6 +105,10 @@ def fetch_emails_for_query():
 
 @gmail_app.route('/process/',methods=['GET']) 
 def process_email_list():
+    """ this endpoint woulod insert the final transaction in the data base after returning 201. 
+        as of now returning the extracted transaction row as it is to caller (no db entry)
+        
+    """
     # execution_id = get_random_execution_id()
 
     email_list = get_email_list()

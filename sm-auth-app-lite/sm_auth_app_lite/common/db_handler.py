@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from sm_auth_app_lite.common.db_init import PipelineExecutionMeta, RawTransactions,db,Transactions
-from sm_auth_app_lite.common.models import MetaEntry
+from sm_auth_app_lite.common.models import MetaEntry, FetchRawMessageResponse
 from dateutil.parser import parse
 from peewee import IntegrityError
 
@@ -13,16 +13,7 @@ def query_raw_messages(ids:list,column:str='snippet'):
         else:
             yield transaction
 
-    
-class FetchRawMessageResponse:
-    def __init__(self,
-                 execution_id,
-                 inserted_msgs,
-                 existing_msgs
-                 ) -> None:
-        self.execution_id = execution_id
-        self.inserted_msgs = inserted_msgs
-        self.existing_msgs = existing_msgs
+
 
 def insert_raw_transactions(execution_id,
                             data_list)-> FetchRawMessageResponse:
@@ -110,9 +101,9 @@ def insert_final_transactions(execution_id, data_generator):
                     msgId=record['msgId'],
                     execution_id=execution_id,
                     msgEpochTime=record['msgEpochTime']/1000,
-                    date= parse(record['date']).date() ,  # Parse date according to format
+                    date= parse(record['date']).date() if record['date'] else None ,  # Parse date according to format
                     to_vpa=record['to_vpa'],
-                    amount_debited=Decimal(record['amount_debited']),
+                    amount_debited=Decimal(record['amount_debited']) if record['amount_debited'] else None,
                 )
                 # Attempt insertion, ignoring conflicts
                 transaction.save()
@@ -127,41 +118,41 @@ def insert_final_transactions(execution_id, data_generator):
                                 "inserted":inserted_ids}
     return processed_emails_response
 
-def insert_execution_metadata(meta:MetaEntry):
-    try:
+# def insert_execution_metadata(meta:MetaEntry):
+#     try:
         
-        PipelineExecutionMeta.create(
-            execution_id=meta.execution_id,
-            gmail_query=meta.query,
-            start_time=meta.start_time,
-            end_time=meta.end_time,
-            thread_count=meta.thread_count,
-            email_message_count=meta.email_message_count,
-            raw_message_count=meta.raw_message_count,
-            decoded_message_count=meta.decoded_message_count,
-            status=meta.status,
-            user_id = 'me'
-        )
-        print("inserted metadata entry: ", meta.execution_id)
-    except Exception as e:
-        raise Exception(f"Unable to insert entry: {e}")
+#         PipelineExecutionMeta.create(
+#             execution_id=meta.execution_id,
+#             gmail_query=meta.query,
+#             start_time=meta.start_time,
+#             end_time=meta.end_time,
+#             thread_count=meta.thread_count,
+#             email_message_count=meta.email_message_count,
+#             raw_message_count=meta.raw_message_count,
+#             decoded_message_count=meta.decoded_message_count,
+#             status=meta.status,
+#             user_id = 'me'
+#         )
+#         print("inserted metadata entry: ", meta.execution_id)
+#     except Exception as e:
+#         raise Exception(f"Unable to insert entry: {e}")
 
 
-def update_stage_data(execution_id, stage_name, **kwargs):
-    """Creates a new PipelineStage entry for the given execution and stage."""
+# def update_stage_data(execution_id, stage_name, **kwargs):
+#     """Creates a new PipelineStage entry for the given execution and stage."""
 
-    # Extract additional data from kwargs (if relevant)
-    thread_count = kwargs.get("thread_count", 0)
-    email_message_count = kwargs.get("email_message_count", 0)
-    raw_message_count = kwargs.get("raw_message_count", 0)
-    decoded_message_count = kwargs.get("decoded_message_count", 0)
+#     # Extract additional data from kwargs (if relevant)
+#     thread_count = kwargs.get("thread_count", 0)
+#     email_message_count = kwargs.get("email_message_count", 0)
+#     raw_message_count = kwargs.get("raw_message_count", 0)
+#     decoded_message_count = kwargs.get("decoded_message_count", 0)
 
-    # Create a new stage entry
-    PipelineExecutionMeta.create(
-        execution_meta_id=execution_id,
-        stage_name=stage_name,
-        thread_count=thread_count,
-        email_message_count=email_message_count,
-        raw_message_count=raw_message_count,
-        decoded_message_count=decoded_message_count,
-    )
+#     # Create a new stage entry
+#     PipelineExecutionMeta.create(
+#         execution_meta_id=execution_id,
+#         stage_name=stage_name,
+#         thread_count=thread_count,
+#         email_message_count=email_message_count,
+#         raw_message_count=raw_message_count,
+#         decoded_message_count=decoded_message_count,
+    # )

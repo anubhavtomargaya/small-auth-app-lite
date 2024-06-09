@@ -4,8 +4,8 @@ creating the flask application. due to which some routes are also inside this
 function. They can be added as a blueprint but I am using these as tools while 
 developement. Run this with run.py" 
 """
-from flask import Flask,redirect, url_for,render_template,current_app,jsonify
-from flask_cors import CORS,cross_origin
+from flask import Flask
+from flask_cors import CORS
 import logging
 from sm_auth_app_lite.common import fh
 from sm_auth_app_lite.blueprints.google_auth import google_auth

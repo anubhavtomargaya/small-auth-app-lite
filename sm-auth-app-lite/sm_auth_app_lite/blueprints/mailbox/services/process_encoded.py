@@ -10,18 +10,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def getContentsFromBody(ebd,parse_dict:dict=None):
-        # values = []
-        # for key in list(parse_dict.keys()):
-        #     value = re.search(rf'{key}', ebd)
-        #     values.append((key,value))
-
-        # return values
-
+def getContentsFromBody(ebd):
         amount_debtied = re.search(r'Rs.\d*', ebd)
         to_vpa = re.search(r'VPA.+?on', ebd)
-        # date = re.search(r'\d{2}-\d{2}-\d{2}', ebd)
-        # date = re.search(r'(\d{2}-\d{2}-\d{2}).*?\.', ebd)
+
         date = re.search(r'(\d{2}-\d{2}-\d{2}.*?)(?=\.)', ebd)
 
         
@@ -52,46 +44,19 @@ def getEmailBody(coded_body):
         email_body = soup.find_all('td',{"class": "td"})[1].text
    
     return email_body
-    # date,to_vpa,amount_debtied = getContentsFromBody(email_body)
-    # return date,to_vpa,amount_debtied
-
-## changes may week 4
-class RegexMapping(object):
-    def __init__(self) -> None:
-        pass
-
-class HDFCUPITransactionRegex(RegexMapping):
-    def __init__(self,
-                 date,
-                 vpa,
-                 amount) -> None:
-        super().__init__()
-        self.date = date
-        self.vpa = vpa
-        self.amount = amount
-
-##
 
 
 def extractBodyFromEncodedData(coded_relevant_json):
     """ not giving a shit about the previous function or the global stage param, just
         needs the key msgEncodedData to be there fks off to do the job 
     """
-    # if not isinstance(coded_relevant_json,list):
-        # raise TypeError("ExtractionError: input must be a list")
-        # x=[]
-    #     x.append(coded_relevant_json)
-    #     coded_relevant_json=x
-    # else:
-    #     pass
-   
+
     try:
         app.logger.info('type of input %s',type(coded_relevant_json))
-        # count = len(coded_relevant_json)
-        # app.logger.info('size of input messages %s',count)
+     
         decoded_extracted_info = []
         failed_first_box = []
-        # coded_relevant_json=list(coded_relevant_json)
+       
         for txn in coded_relevant_json:
             # logger.info('message %s',message)
             try:
@@ -99,10 +64,8 @@ def extractBodyFromEncodedData(coded_relevant_json):
                     message = txn.__dict__['__data__']
                 else:
                     message = txn
-                # print("msg: ",message)
-                data = message['msgEncodedData']
-                # app.logger.info('processing json ')
-                # date,to_vpa,amount_debtied = getEmailBody(data)
+
+                data = message['msgEncodedData']  
                 email_body = getEmailBody(data)
                 date,to_vpa,amount_debtied = getContentsFromBody(email_body)
 

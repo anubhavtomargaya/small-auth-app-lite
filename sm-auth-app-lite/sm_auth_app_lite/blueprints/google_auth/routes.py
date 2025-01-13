@@ -1,15 +1,20 @@
-
-
 from authlib.client import OAuth2Session
-from flask import current_app, url_for, redirect
+from flask import current_app, url_for, redirect, jsonify
 import flask 
 import ast
 import json 
 
-from sm_auth_app_lite.common.session_manager import set_auth_state,set_auth_token, clear_auth_session, get_next_url,is_logged_in
+from sm_auth_app_lite.common.session_manager import (
+    get_auth_state,
+    set_auth_state,
+    set_auth_token, 
+    clear_auth_session, 
+    get_next_url,
+    is_logged_in,
+    get_auth_token
+)
 from sm_auth_app_lite.common.constants import *
 from .auth import get_user_info
-
 
 from . import google_auth, no_cache
 
@@ -118,4 +123,81 @@ def etc():
         # return render_template("index.html")
 
         return flask.jsonify("ERORROR )")
+
+@google_auth.route('/credentials')
+@no_cache
+def get_credentials():
+    """Secure endpoint to get Gmail credentials"""
+    if not is_logged_in():
+        return jsonify({
+            "error": "Unauthorized",
+            "message": "User must be logged in"
+        }), 401
+    
+    try:
+        oauth2_tokens = get_auth_token()
+        if not oauth2_tokens:
+            return jsonify({
+                "error": "No tokens found",
+                "message": "Please login again"
+            }), 404
+            
+        return jsonify({
+            "credentials": {
+                "token": oauth2_tokens['access_token'],
+                "refresh_token": oauth2_tokens['refresh_token'],
+                "client_id": CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
+                "token_uri": ACCESS_TOKEN_URI,
+                "scopes": AUTHORIZATION_SCOPE
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": "Server Error",
+            "message": str(e)
+        }), 500
+
+@google_auth.route('/token')
+@no_cache
+def get_token():
+    """Get a long-lived access token for external use"""
+    if not is_logged_in():
+        current_app.logger.info("Not logged in,%s",get_auth_state())
+        current_app.logger.info("Not logged in,%s",get_auth_token())
+        return jsonify({
+            "error": "Unauthorized",
+            "message": "Please login first at /google/login"
+        }), 401
+    
+    try:
+        oauth2_tokens = get_auth_token()
+        if not oauth2_tokens:
+            return jsonify({
+                "error": "No tokens found",
+                "message": "Please login again"
+            }), 404
+            
+        return jsonify({
+            "token": {
+                "access_token": oauth2_tokens['access_token'],
+                "refresh_token": oauth2_tokens['refresh_token']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": "Server Error",
+            "message": str(e)
+        }), 500
+
+@google_auth.route('/status')
+@no_cache
+def login_status():
+    """Check login status"""
+    return jsonify({
+        "logged_in": is_logged_in(),
+        "message": "User is logged in" if is_logged_in() else "User is not logged in"
+    })
 

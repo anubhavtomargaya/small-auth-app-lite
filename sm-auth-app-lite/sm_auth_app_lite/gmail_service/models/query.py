@@ -4,15 +4,15 @@ from typing import Optional, List
 
 @dataclass
 class EmailQuery:
-    """Email search parameters"""
+    """Email search query parameters"""
     sender: Optional[str] = None
+    subject: Optional[str] = None
     after: Optional[datetime] = None
     before: Optional[datetime] = None
-    subject: Optional[str] = None
+    labels: Optional[List[str]] = None
     has_attachment: bool = False
     include_spam: bool = False
     max_results: int = 100
-    labels: Optional[List[str]] = None
     raw_query: Optional[str] = None
 
     def to_gmail_query(self) -> str:

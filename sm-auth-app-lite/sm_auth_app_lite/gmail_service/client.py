@@ -1,7 +1,8 @@
-from typing import List, Optional, Union, Set
+from typing import List, Optional, Union, Set, Dict, Any
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import logging
 
 from .models.credentials import GmailCredentials
 from .models.message import EmailMessage
@@ -17,6 +18,7 @@ class GmailClient:
         self._validate_credentials(credentials)
         self.credentials = credentials
         self.service = self._build_service()
+        self._logger = logging.getLogger(__name__)
         
     def _validate_credentials(self, credentials: GmailCredentials) -> None:
         """Validate Gmail credentials"""
@@ -79,78 +81,82 @@ class GmailClient:
             print(f"Failed to get recent messages: {str(e)}")
             raise GmailError(f"Failed to get recent messages: {str(e)}")
         
-    def search(
-        self, 
-        query: EmailQuery, 
-        processor: Optional[BaseProcessor] = None,
-        include_labels: Set[str] = {GmailLabel.INBOX.value},
-        exclude_labels: Set[str] = None
-    ) -> List[EmailMessage]:
+    def search(self, query: EmailQuery = None, max_results: int = 10) -> List[EmailMessage]:
         """
-        Search emails with query
-        
-        Args:
-            query: EmailQuery object with search criteria
-            processor: Optional processor for email content
-            include_labels: Set of labels that messages must have (default: INBOX)
-            exclude_labels: Set of labels to exclude (default: all category labels)
+        Search emails using Gmail query syntax
         """
         try:
-            # Set default exclude labels if none provided
-            if exclude_labels is None:
-                exclude_labels = GmailLabel.category_labels()
-            
+            # Build Gmail query string
+            q = self._build_search_query(query) if query else ""
+            self._logger.debug(f"Search query: {q}")
+
             # Execute search
-            results = self.service.users().messages().list(
+            response = self.service.users().messages().list(
                 userId='me',
-                q=str(query.to_gmail_query()),
-                maxResults=query.max_results,
-                labelIds=list(include_labels)
+                q=q,
+                maxResults=max_results
             ).execute()
-            
+
             messages = []
-            message_list = results.get('messages', [])
-            
-            if not message_list:
-                print(f"No messages found for query: {str(query)}")
-                return []
-                
-            for msg in message_list:
-                # Get full message details
-                full_msg = self.service.users().messages().get(
-                    userId='me',
-                    id=msg['id'],
-                    format='full'
-                ).execute()
-                
-                # Check message labels
-                msg_labels = full_msg.get('labelIds', [])
-                
-                # Skip if message has any excluded labels
-                if exclude_labels and LabelFilter.has_any_label(msg_labels, exclude_labels):
-                    continue
+            for msg in response.get('messages', []):
+                try:
+                    # Get full message details
+                    full_msg = self.service.users().messages().get(
+                        userId='me',
+                        id=msg['id'],
+                        format='full'
+                    ).execute()
                     
-                # Skip if message doesn't have all required labels
-                if include_labels and not LabelFilter.has_all_labels(msg_labels, include_labels):
-                    continue
-                
-                # Create EmailMessage
-                email = EmailMessage.from_gmail_message(full_msg)
-                
-                # Process if processor provided
-                if processor:
-                    processed = processor.process(email)
-                    if processed:
-                        email.html_content = processed
-                        
-                messages.append(email)
-                
-                # Check if we have enough messages after filtering
-                if len(messages) >= query.max_results:
-                    break
+                    # Extract required fields for EmailMessage
+                    headers = {h['name']: h['value'] for h in full_msg['payload']['headers']}
                     
+                    message = EmailMessage(
+                        message_id=full_msg['id'],
+                        thread_id=full_msg['threadId'],
+                        internal_date=datetime.fromtimestamp(int(full_msg['internalDate'])/1000),
+                        subject=headers.get('Subject', ''),
+                        sender=headers.get('From', ''),
+                        recipient=headers.get('To', ''),
+                        snippet=full_msg.get('snippet', ''),
+                        raw_message=full_msg,
+                        labels=full_msg.get('labelIds', [])
+                    )
+                    messages.append(message)
+                    
+                except Exception as e:
+                    self._logger.error(f"Failed to process message {msg['id']}: {str(e)}")
+                    continue
+
             return messages
-            
+
         except Exception as e:
-            print(f"Search failed: {str(e)}")
-            raise GmailError(f"Search failed: {str(e)}")
+            self._logger.error(f"Search failed: {str(e)}")
+            return []
+
+    def _build_search_query(self, query: EmailQuery) -> str:
+        """Build Gmail API query string from EmailQuery object"""
+        parts = []
+
+        if query.sender:
+            parts.append(f"from:{query.sender}")
+        
+        if query.subject:
+            parts.append(f"subject:{query.subject}")
+
+        if query.after:
+            # Convert datetime to Gmail's search format (YYYY/MM/DD)
+            after_str = query.after.strftime("%Y/%m/%d")
+            parts.append(f"after:{after_str}")
+            
+        if query.before:
+            before_str = query.before.strftime("%Y/%m/%d")
+            parts.append(f"before:{before_str}")
+
+        if query.labels:
+            for label in query.labels:
+                parts.append(f"label:{label}")
+
+        if query.has_attachment:
+            parts.append("has:attachment")
+
+        return " ".join(parts)

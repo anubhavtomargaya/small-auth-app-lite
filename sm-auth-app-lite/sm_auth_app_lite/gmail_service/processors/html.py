@@ -1,6 +1,7 @@
 from typing import Optional, Dict, Any
 from bs4 import BeautifulSoup
 from .base import BaseProcessor
+from ..models.message import EmailMessage
 
 class HTMLProcessor(BaseProcessor):
     """Process HTML emails with element targeting capabilities"""

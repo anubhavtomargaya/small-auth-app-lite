@@ -85,6 +85,9 @@ class BaseProcessor(ABC):
         """Return mime type this processor handles"""
         pass
 
+    def get_mime_type(self) -> str:
+        return 'text/html'
+
     def _get_payload_part(self, payload: Dict, mime_type: str) -> Optional[Dict]:
         """Find payload part with specific mime type"""
         if not payload:

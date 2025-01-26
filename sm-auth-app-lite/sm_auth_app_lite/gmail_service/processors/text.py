@@ -1,10 +1,14 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 import base64
 from .base import BaseProcessor
+from ..models.message import EmailMessage
 
 class TextProcessor(BaseProcessor):
     """Extract plain text content from emails"""
     
+    def get_mime_type(self) -> str:
+        return 'text/plain'
+
     def process(self, message: dict) -> Optional[str]:
         """Extract and decode plain text content"""
         try:

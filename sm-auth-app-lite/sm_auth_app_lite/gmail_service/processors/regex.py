@@ -1,12 +1,41 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import re
 import logging
-
-class RegexProcessor:
+from .base import BaseProcessor
+from ..models.message import EmailMessage
+hdfc_patterns = {
+    "amount": r"Rs\.(\d+\.\d{2})",
+    "vpa": r"to VPA\s+([^\s]+)",
+    "recipient": r"@\w+\s+([A-Za-z\s]+?)\s+on",  # Updated to handle mixed case names
+    "date": r"on\s+(\d{2}-\d{2}-\d{2})",
+    "reference": r"reference number is (\d+)"
+}
+class RegexProcessor(BaseProcessor):
     """Process text using regex patterns from external configuration"""
     
     def __init__(self):
-        self._logger = logging.getLogger(__name__)
+        super().__init__()
+        self._patterns =hdfc_patterns
+
+    def get_mime_type(self) -> str:
+        return 'text/html'  # We'll process HTML content
+
+    def process(self, message: EmailMessage) -> Optional[Dict[str, Any]]:
+        """Override base process to add regex extraction"""
+        # First get base processing result
+        base_result = super().process(message)
+        if not base_result:
+            return None
+
+        # Then apply regex extraction on decoded content
+        if base_result['decoded_content']:
+            extracted = self.extract(base_result['decoded_content'], self._patterns)
+            return {
+                'metadata': base_result['metadata'],
+                'decoded_content': base_result['decoded_content'],
+                'extracted': extracted
+            }
+        return base_result
 
     def extract(self, text: str, patterns: Dict[str, str]) -> Dict[str, Any]:
         """

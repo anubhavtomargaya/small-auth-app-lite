@@ -10,6 +10,7 @@ import logging
 from sm_auth_app_lite.common import fh
 from sm_auth_app_lite.blueprints.google_auth import google_auth
 from sm_auth_app_lite.blueprints.mailbox import gmail_app
+from sm_auth_app_lite.blueprints.gmail import gmail_bp
 from sm_auth_app_lite.common.session_manager import *
 
 logging.basicConfig(level=logging.INFO)  
@@ -32,16 +33,17 @@ def create_app():
     app.register_blueprint(gmail_app, url_prefix='/api/v1/mailbox')
     app.logger.info('Flask bp registerd, %s',"/mailbox")
     
+    app.register_blueprint(gmail_bp, url_prefix='/api/v1/gmail')
+    app.logger.info('Flask bp registerd, %s',"/gmail")
+    
     ## added this route for startup help
     @app.route('/') 
     def index():
         sth = """ <p> - /google for google auth, fetching token for user & permissions etc. </br>
                     - /api/v1/mailbox for gmail api related actions  </br>
-                        - /match -> sends the query to gmail api- returns threads as it is </br>
-                        - /fetch -> processess the matched threads to extract emails (each thread can have multiple emails). </br>
-                                    Emails are in the form base64 encoded html data. </br>
-                        - /process -> takes the encoded emails, turns into html & parses the relevant info using regex.  </br>
-                    Ability to pass custom regex/use GPT to do this job.  </br></p>
+                    - /api/v1/gmail for new Gmail service endpoints  </br>
+                        - /search -> search emails with query parameters </br>
+                        - /hdfc -> get and process HDFC transactions </br></p>
     """
         return sth
     return app

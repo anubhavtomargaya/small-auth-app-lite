@@ -45,3 +45,16 @@ class EmailMessage:
             raw_message=message,
             labels=message.get('labelIds', [])
         )
+
+    def to_dict(self) -> Dict:
+        """Convert EmailMessage to dictionary"""
+        return {
+            'message_id': self.message_id,
+            'thread_id': self.thread_id,
+            'date': self.internal_date.isoformat() if self.internal_date else None,
+            'subject': self.subject,
+            'sender': self.sender,
+            'recipient': self.recipient,
+            'snippet': self.snippet,
+            'labels': self.labels
+        }

@@ -35,7 +35,7 @@ class GmailClient:
         except Exception as e:
             raise GmailError(f"Failed to build Gmail service: {str(e)}")
             
-    def get_recent(self, days: int = 7, max_results: int = 10,labels: Set[str] = {GmailLabel.INBOX.value}) -> List[EmailMessage]:
+    def get_recent(self, days: int = 7, max_results: int = 10, labels: Set[str] = {GmailLabel.INBOX.value}) -> List[EmailMessage]:
         """Get recent emails using direct messages.list API"""
         try:
             # Get messages directly using messages.list
@@ -49,36 +49,41 @@ class GmailClient:
             message_list = results.get('messages', [])
             
             if not message_list:
-                print("No recent messages found")
+                self._logger.info("No recent messages found")
                 return []
                 
+            cutoff_date = datetime.now() - timedelta(days=days) if days else None
+            
             for msg in message_list:
-                # Get full message details
-                full_msg = self.service.users().messages().get(
-                    userId='me',
-                    id=msg['id'],
-                    format='full'
-                ).execute()
-                
-                # Convert to EmailMessage
-                email = EmailMessage.from_gmail_message(full_msg)
-                
-                # Filter by date if needed
-                if days:
-                    cutoff_date = datetime.now() - timedelta(days=days)
-                    if email.internal_date and email.internal_date < cutoff_date:
+                try:
+                    # Get full message details
+                    full_msg = self.service.users().messages().get(
+                        userId='me',
+                        id=msg['id'],
+                        format='full'
+                    ).execute()
+                    
+                    # Convert to EmailMessage
+                    email = EmailMessage.from_gmail_message(full_msg)
+                    
+                    # Filter by date if needed
+                    if cutoff_date and email.internal_date and email.internal_date < cutoff_date:
                         continue
                         
-                messages.append(email)
-                
-                # Check if we have enough messages after filtering
-                if len(messages) >= max_results:
-                    break
+                    messages.append(email)
                     
+                    # Check if we have enough messages after filtering
+                    if len(messages) >= max_results:
+                        break
+                        
+                except Exception as e:
+                    self._logger.error(f"Failed to process message {msg['id']}: {str(e)}")
+                    continue
+                
             return messages
             
         except Exception as e:
-            print(f"Failed to get recent messages: {str(e)}")
+            self._logger.error(f"Failed to get recent messages: {str(e)}")
             raise GmailError(f"Failed to get recent messages: {str(e)}")
         
     def search(self, query: EmailQuery = None, max_results: int = 10) -> List[EmailMessage]:

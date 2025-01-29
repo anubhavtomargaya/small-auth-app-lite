@@ -1,4 +1,4 @@
-from flask import current_app as app, jsonify, request, url_for, redirect
+from flask import current_app as app, jsonify, request, url_for, redirect, send_file, send_from_directory, render_template
 from . import gmail_bp
 from sm_auth_app_lite.common.session_manager import (
     is_logged_in, get_auth_token, set_next_url
@@ -11,6 +11,9 @@ from sm_auth_app_lite.gmail_service.processors.html import HTMLProcessor
 from sm_auth_app_lite.gmail_service.processors.base import BaseProcessor
 from sm_auth_app_lite.gmail_service.processors.regex import RegexProcessor
 from datetime import datetime, timedelta
+from sm_auth_app_lite.gmail_service.service import GmailService
+from typing import Optional
+import os
 
 @gmail_bp.route('/', methods=['GET'])
 def index():
@@ -26,20 +29,10 @@ def search_emails():
         return jsonify({"error": "Not authenticated"}), 401
         
     try:
-        # Get token and create credentials
-        oauth2_tokens = get_auth_token()
-        credentials = {
-            'token': oauth2_tokens['access_token'],
-            'refresh_token': oauth2_tokens['refresh_token'],
-            'token_uri': ACCESS_TOKEN_URI,
-            'client_id': CLIENT_ID,
-            'client_secret': CLIENT_SECRET,
-            'scopes': ['https://www.googleapis.com/auth/gmail.readonly']
-        }
+        # Get processor type from request args, default to None for raw messages
+        processor_type = request.args.get('processor')
+        service = get_gmail_service(processor_type=processor_type)
         
-        gmail = GmailClient(GmailCredentials(**credentials))
-        
-        # Build query from params
         query = EmailQuery(
             sender=request.args.get('sender'),
             subject=request.args.get('subject'),
@@ -47,16 +40,8 @@ def search_emails():
             max_results=int(request.args.get('max_results', 10))
         )
         
-        # Search emails
-        messages = gmail.search(query=query)
-        return jsonify([{
-            'id': msg.message_id,
-            'subject': msg.subject,
-            'sender': msg.sender,
-            'date': msg.internal_date.isoformat() if msg.internal_date else None,
-            'snippet': msg.snippet,
-            'labels': msg.labels
-        } for msg in messages])
+        results = service.search_and_process(query=query)
+        return jsonify(results)
         
     except Exception as e:
         app.logger.error(f"Search failed: {str(e)}")
@@ -71,50 +56,23 @@ def get_processor(processor_type: str = 'html'):
     }
     return processors.get(processor_type)
 
-@gmail_bp.route('/recent', methods=['GET'])
-def recent_emails():
-    if not is_logged_in():
-        return jsonify({"error": "Not authenticated"}), 401
-        
-    try:
-        # Get token and create credentials
-        oauth2_tokens = get_auth_token()
-        credentials = {
-            'token': oauth2_tokens['access_token'],
-            'refresh_token': oauth2_tokens['refresh_token'],
-            'token_uri': ACCESS_TOKEN_URI,
-            'client_id': CLIENT_ID,
-            'client_secret': CLIENT_SECRET,
-            'scopes': ['https://www.googleapis.com/auth/gmail.readonly']
-        }
-        
-        gmail = GmailClient(GmailCredentials(**credentials))
-        
-        # Get parameters
-        days = int(request.args.get('days', 7))
-        max_results = int(request.args.get('max_results', 10))
-        processor_type = request.args.get('processor', 'regex')
-        
-        # Get processor
-        processor = get_processor(processor_type)
-        if not processor:
-            return jsonify({"error": f"Invalid processor type: {processor_type}"}), 400
-        
-        # Get recent messages
-        messages = gmail.get_recent(days=days, max_results=max_results)
-        
-        # Process messages using the selected processor
-        results = []
-        for msg in messages:
-            processed = processor.process(msg)
-            if processed:
-                results.append(processed)
-                
-        return jsonify(results)
-        
-    except Exception as e:
-        app.logger.error(f"Recent emails failed: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+def get_gmail_service(processor_type: Optional[str] = None) -> GmailService:
+    """Helper to create GmailService with credentials and processor"""
+    oauth2_tokens = get_auth_token()
+    credentials = {
+        'token': oauth2_tokens['access_token'],
+        'refresh_token': oauth2_tokens['refresh_token'],
+        'token_uri': ACCESS_TOKEN_URI,
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET,
+        'scopes': ['https://www.googleapis.com/auth/gmail.readonly']
+    }
+    
+    client = GmailClient(GmailCredentials(**credentials))
+    
+    if processor_type:
+        return GmailService.with_processor(client, processor_type)
+    return GmailService(client)
 
 @gmail_bp.route('/hdfc', methods=['GET'])
 def get_hdfc_transactions():
@@ -122,12 +80,9 @@ def get_hdfc_transactions():
         return jsonify({"error": "Not authenticated"}), 401
         
     try:
-        # Get token and create credentials
-        token = get_auth_token()
-        credentials = GmailCredentials(**token)
-        gmail = GmailClient(credentials)
+        # Use HTML processor for HDFC emails
+        service = get_gmail_service(processor_type='html')
         
-        # Search HDFC emails
         query = EmailQuery(
             sender='alerts@hdfcbank.net',
             subject='UPI txn',
@@ -135,27 +90,44 @@ def get_hdfc_transactions():
             max_results=int(request.args.get('max_results', 50))
         )
         
-        messages = gmail.search(query=query)
-        
-        # Process HDFC emails
-        processor = HTMLProcessor()
-        
-        results = []
-        for msg in messages:
-            try:
-                result = processor.process(msg)
-                if result:
-                    results.append({
-                        'message_id': msg.message_id,
-                        'date': msg.internal_date.isoformat() if msg.internal_date else None,
-                        'content': result
-                    })
-            except Exception as e:
-                app.logger.error(f"Failed to process message {msg.message_id}: {str(e)}")
-                continue
-                
+        results = service.search_and_process(query=query)
         return jsonify(results)
         
     except Exception as e:
         app.logger.error(f"HDFC processing failed: {str(e)}")
-        return jsonify({"error": str(e)}), 500 
+        return jsonify({"error": str(e)}), 500
+
+@gmail_bp.route('/recent', methods=['GET'])
+def recent_emails():
+    if not is_logged_in():
+        return jsonify({"error": "Not authenticated"}), 401
+        
+    try:
+        # Get processor type from request args, default to regex
+        processor_type = request.args.get('processor', 'regex')
+        service = get_gmail_service(processor_type=processor_type)
+        
+        results = service.get_recent_processed(
+            days=int(request.args.get('days', 7)),
+            max_results=int(request.args.get('max_results', 10))
+        )
+        return jsonify(results)
+        
+    except Exception as e:
+        app.logger.error(f"Recent emails failed: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@gmail_bp.route('/labels', methods=['GET'])
+def get_labels():
+    if not is_logged_in():
+        return jsonify({"error": "Not authenticated"}), 401
+        
+    try:
+        service = get_gmail_service()  # No processor needed for labels
+        labels = service.get_labels()
+        return jsonify(labels)
+        
+    except Exception as e:
+        app.logger.error(f"Failed to get labels: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+

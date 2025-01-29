@@ -6,10 +6,11 @@ from .client import GmailClient
 from .processors.base import BaseProcessor
 from .models.message import EmailMessage
 from .models.labels import GmailLabel
-from .exceptions import GmailServiceError
 from .processors.html import HTMLProcessor
 from .processors.regex import RegexProcessor
 from .models.query import EmailQuery
+
+from .exceptions import GmailServiceError
 
 class GmailService:
     """Service layer for Gmail operations and message processing"""

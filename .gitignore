@@ -169,3 +169,4 @@ sm-auth-app-lite/sm_auth_app_lite/pockets.db-shm
 sm-auth-app-lite/sm_auth_app_lite/pockets.db-wal
 sm-auth-app-lite/sm_auth_app_lite/token.json
 .gitignore
+sm-auth-app-lite/sm_auth_app_lite/GmailService_01.ipynb

@@ -8,7 +8,6 @@ from .models.credentials import GmailCredentials
 from .models.message import EmailMessage
 from .models.query import EmailQuery
 from .exceptions import GmailError, AuthError
-from .processors.base import BaseProcessor
 from .models.labels import GmailLabel, LabelFilter
 
 class GmailClient:

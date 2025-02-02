@@ -1,68 +1,98 @@
 from typing import Dict, Any, Optional
 import re
 import logging
-from .base import BaseProcessor
+from .html import HTMLProcessor
 from ..models.message import EmailMessage
+
 hdfc_patterns = {
     "amount": r"Rs\.(\d+\.\d{2})",
     "vpa": r"to VPA\s+([^\s]+)",
-    "recipient": r"@\w+\s+([A-Za-z\s]+?)\s+on",  # Updated to handle mixed case names
+    "recipient": r"@\w+\s+([A-Za-z\s]+?)\s+on",
     "date": r"on\s+(\d{2}-\d{2}-\d{2})",
     "reference": r"reference number is (\d+)"
 }
-class RegexProcessor(BaseProcessor):
-    """Process text using regex patterns from external configuration"""
+
+class RegexProcessor(HTMLProcessor):
+    """Process text using regex patterns after HTML processing"""
     
     def __init__(self):
         super().__init__()
-        self._patterns =hdfc_patterns
-
-    def get_mime_type(self) -> str:
-        return 'text/html'  # We'll process HTML content
+        self._patterns = hdfc_patterns
 
     def process(self, message: EmailMessage) -> Optional[Dict[str, Any]]:
-        """Override base process to add regex extraction"""
-        # First get base processing result
-        base_result = super().process(message)
-        if not base_result:
-            return None
+        """Override HTMLProcessor process to add regex extraction"""
+        try:
+            # First get HTML processing result
+            html_result = super().process(message)
+            if not html_result:
+                self._logger.warning(f"HTML processing failed for message {message.message_id}")
+                return {
+                    'metadata': message.to_dict(),
+                    'decoded_content': {
+                        'text': 'HTML processing failed',
+                        'extracted': {'data': {k: None for k in self._patterns.keys()},
+                                    'error': 'HTML processing failed'
+                                    }
+                    }
+                }
 
-        # Then apply regex extraction on decoded content
-        if base_result['decoded_content']:
-            extracted = self.extract(base_result['decoded_content'], self._patterns)
+            # Get clean text from HTML processor's result
+            clean_text = html_result['decoded_content'].get('text')
+            if not clean_text:
+                self._logger.warning(f"No clean text found in HTML result for message {message.message_id}")
+                html_result['decoded_content']['extracted'] = {
+                    'data': {k: None for k in self._patterns.keys()},
+                    'error': 'No text content found'
+                }
+                return html_result
+
+            # Apply regex patterns on clean text
+            try:
+                extracted = self.extract(clean_text, self._patterns)
+                html_result['decoded_content']['extracted'] = {
+                    'data': extracted,
+                    'error': None
+                }
+                
+                # Add processing status
+                if not any(extracted.values()):
+                    html_result['decoded_content']['extracted']['error'] = 'No patterns matched'
+                else:
+                    html_result['decoded_content']['extracted']['error'] = None
+                    
+            except Exception as e:
+                self._logger.error(f"Pattern extraction failed for message {message.message_id}: {str(e)}")
+                html_result['decoded_content']['extracted'] = {
+                    'data': {k: None for k in self._patterns.keys()},
+                    'error': f'Pattern extraction failed: {str(e)}'
+                }
+            
+            return html_result
+            
+        except Exception as e:
+            self._logger.error(f"Regex processing failed completely for message {message.message_id}: {str(e)}")
             return {
-                'metadata': base_result['metadata'],
-                'decoded_content': base_result['decoded_content'],
-                'extracted': extracted
+                'metadata': message.to_dict(),
+                'decoded_content': {
+                    'text': 'Processing failed',
+                    'extracted': {
+                        'data': {k: None for k in self._patterns.keys()},
+                        'error': f'Processing failed: {str(e)}'
+                    }
+                }
             }
-        return base_result
 
     def extract(self, text: str, patterns: Dict[str, str]) -> Dict[str, Any]:
-        """
-        Extract data using provided regex patterns
-        
-        Args:
-            text: Text to process
-            patterns: Dict mapping field names to regex patterns
-                     e.g. {"amount": r"Rs\.?\s*(\d+(?:\.\d{2})?)", 
-                           "date": r"(\d{2}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})"}
-        
-        Returns:
-            Dict with extracted values
-        """
-        try:
-            results = {}
-            for field_name, pattern in patterns.items():
+        """Extract data using provided regex patterns"""
+        results = {}
+        for field_name, pattern in patterns.items():
+            try:
                 match = re.search(pattern, text)
-                if match:
-                    # Always use first capture group
-                    results[field_name] = match.group(1)
-                else:
-                    results[field_name] = None
+                results[field_name] = match.group(1) if match else None
+                if not match:
                     self._logger.debug(f"No match found for {field_name} using pattern: {pattern}")
-
-            return results
-
-        except Exception as e:
-            self._logger.error(f"Extraction failed: {str(e)}")
-            return {} 
+            except Exception as e:
+                self._logger.error(f"Pattern matching failed for {field_name}: {str(e)}")
+                results[field_name] = None
+                
+        return results 

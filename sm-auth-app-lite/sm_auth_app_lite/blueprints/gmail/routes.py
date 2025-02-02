@@ -7,9 +7,7 @@ from sm_auth_app_lite.gmail_service.client import GmailClient
 from sm_auth_app_lite.gmail_service.models.query import EmailQuery
 from sm_auth_app_lite.gmail_service.models.credentials import GmailCredentials
 from sm_auth_app_lite.blueprints.google_auth.routes import CLIENT_ID, CLIENT_SECRET, ACCESS_TOKEN_URI
-from sm_auth_app_lite.gmail_service.processors.html import HTMLProcessor
-from sm_auth_app_lite.gmail_service.processors.base import BaseProcessor
-from sm_auth_app_lite.gmail_service.processors.regex import RegexProcessor
+
 from datetime import datetime, timedelta
 from sm_auth_app_lite.gmail_service.service import GmailService
 from typing import Optional
@@ -47,14 +45,7 @@ def search_emails():
         app.logger.error(f"Search failed: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-def get_processor(processor_type: str = 'html'):
-    """Get the appropriate processor based on type"""
-    processors = {
-        'html': HTMLProcessor(),
-        'text': BaseProcessor(),
-        'regex': RegexProcessor()
-    }
-    return processors.get(processor_type)
+
 
 def get_gmail_service(processor_type: Optional[str] = None) -> GmailService:
     """Helper to create GmailService with credentials and processor"""

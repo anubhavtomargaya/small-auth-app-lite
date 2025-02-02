@@ -233,16 +233,15 @@ class GmailService:
 
             # Drop embeddings column before returning results
             df_with_categories = df_with_categories.drop('embedding', axis=1)
-
             # Move category from top level to decoded_content
             results = []
             for record in df_with_categories.to_dict(orient='records'):
                 category = record.pop('category', 'D')  # Remove category from top level
+                record['content']['decoded_content'].pop('llm_analysis', None)  # Remove llm_analysis
                 record['content']['decoded_content']['category'] = category  # Put category in decoded_content
                 results.append(record)
 
             return results
-            
         except Exception as e:
             self._logger.error(f"Failed to process all emails: {str(e)}")
             raise GmailServiceError(f"Service error: {str(e)}") 

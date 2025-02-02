@@ -27,10 +27,12 @@ class BaseProcessor(ABC):
                 
             # Step 2: Decode content if present
             decoded = self._decode_content(extracted['encoded_content']) if extracted['encoded_content'] else None
-            
+            #check mime type and process accordingly; add metadata for it later.
             return {
                 'metadata': extracted['metadata'],
-                'decoded_content': decoded
+                'decoded_content': {
+                    'html': decoded
+                }
             }
             
         except Exception as e:

@@ -20,38 +20,36 @@ class HTMLProcessor(BaseProcessor):
         try:
             # Get metadata and decoded content from base processor
             base_result = super().process(message)
-            if not base_result or not base_result['decoded_content']:
+            if not base_result or not base_result['decoded_content'] or not base_result['decoded_content']['html']:
                 return None
-
             # Process HTML content and store soup
-            self.soup = BeautifulSoup(base_result['decoded_content'], 'html.parser')
-            
+            self.soup = BeautifulSoup(base_result['decoded_content']['html'], 'html.parser')
+            # accesss soup later;
             # If no target specified, return full HTML
             if not self.target_element:
                 base_result['decoded_content'] = {
-                    'html': str(self.soup),
                     'text': self.soup.get_text(separator=' ', strip=True)
                 }
                 return base_result
             
-            # Use find_elements method for target filtering
-            elements = self.find_elements(self.target_element)
-            if not elements:
-                self._logger.warning(f"No elements found matching {self.target_element}")
-                return None
+            # # Use find_elements method for target filtering
+            # elements = self.find_elements(self.target_element)
+            # if not elements:
+            #     self._logger.warning(f"No elements found matching {self.target_element}")
+            #     return None
                 
-            # Extract content from elements
-            extracted = []
-            for elem in elements:
-                extracted.append({
-                    'html': str(elem),
-                    'text': elem.get_text(separator=' ', strip=True)
-                })
+            # # Extract content from elements
+            # extracted = []
+            # for elem in elements:
+            #     extracted.append({
+            #         'html': str(elem),
+            #         'text': elem.get_text(separator=' ', strip=True)
+            #     })
                 
-            base_result['decoded_content'] = {
-                'elements': extracted,
-                'count': len(extracted)
-            }
+            # base_result['decoded_content'] = {
+            #     'elements': extracted,
+            #     'count': len(extracted)
+            # }
             return base_result
             
         except Exception as e:

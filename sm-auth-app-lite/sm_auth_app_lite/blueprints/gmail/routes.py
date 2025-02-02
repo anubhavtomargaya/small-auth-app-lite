@@ -131,3 +131,11 @@ def get_labels():
         app.logger.error(f"Failed to get labels: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+
+@gmail_bp.route('/view')
+def dashboard():
+    """Serve the Gmail search dashboard."""
+    if not is_logged_in():
+        set_next_url(url_for('gmail_bp.dashboard'))
+        return redirect(url_for('google_auth.login'))
+    return render_template('gmail/dashboard.html')

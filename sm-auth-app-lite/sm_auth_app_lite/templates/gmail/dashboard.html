@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Search Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-xl font-semibold">Gmail Search</h1>
+                    </div>
+                    <div class="flex items-center">
+                        <button onclick="logout()" class="text-gray-600 hover:text-gray-900">
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <!-- Search Form -->
+            <div class="bg-white shadow rounded-lg p-6 mb-6">
+                <h2 class="text-lg font-medium mb-4">Search Filters</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Sender</label>
+                        <input type="text" id="sender" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Subject</label>
+                        <input type="text" id="subject" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Days</label>
+                        <input type="number" id="days" value="7" min="1" max="30" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Processor</label>
+                        <select id="processor" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="html">HTML</option>
+                            <option value="text">Text</option>
+                            <option value="regex">Regex</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-4 flex gap-4">
+                    <button onclick="searchEmails()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                        Search
+                    </button>
+                    <button onclick="getRecentEmails()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                        Recent Emails
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results" class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-lg font-medium mb-4">Results</h2>
+                <div id="loading" class="hidden">
+                    <div class="flex justify-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                </div>
+                <div id="emailList" class="space-y-4">
+                    <!-- Results will be populated here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+
+        function displayEmails(response) {
+            console.log('Raw response:', response);
+            const emailList = document.getElementById('emailList');
+            emailList.innerHTML = '';
+
+            if (!Array.isArray(response)) {
+                console.error('Invalid response format:', response);
+                emailList.innerHTML = '<div class="text-red-500">Error: Invalid response format</div>';
+                return;
+            }
+
+            response.forEach((email, index) => {
+                console.log(`Processing email ${index}:`, email);
+                
+                // Access metadata from the correct path
+                const metadata = email.content?.metadata || {};
+                const decodedContent = email.content?.decoded_content || {};
+                
+                const div = document.createElement('div');
+                div.className = 'border rounded-lg p-4 hover:bg-gray-50 mb-4';
+                
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-medium text-lg">${metadata.subject || 'No Subject'}</h3>
+                            <p class="text-sm text-gray-600">${metadata.sender || 'Unknown Sender'}</p>
+                        </div>
+                        <span class="text-sm text-gray-500">
+                            ${new Date(metadata.date).toLocaleString()}
+                        </span>
+                    </div>
+                    <div class="mt-2 text-gray-700">
+                        ${decodedContent.text || 'No preview available'}
+                    </div>
+                    <div class="mt-2 text-sm text-gray-500">
+                        Labels: ${metadata.labels?.join(', ') || 'None'}
+                    </div>
+                `;
+                emailList.appendChild(div);
+            });
+        }
+
+        function showProcessedContent(emailId) {
+            // This would be a separate API call to get processed content
+            axios.get(`/api/v1/gmail/email/${emailId}/content`)
+                .then(response => {
+                    // Show processed content in a modal or expandable section
+                    console.log(response.data);
+                });
+        }
+
+        function searchEmails() {
+            showLoading(true);
+            const params = {
+                sender: document.getElementById('sender').value,
+                subject: document.getElementById('subject').value,
+                days: document.getElementById('days').value,
+                processor: document.getElementById('processor').value
+            };
+
+            console.log('Search params:', params);
+
+            axios.get('/api/v1/gmail/search', { params })
+                .then(response => {
+                    console.log('Search response:', response.data);
+                    displayEmails(response.data);
+                })
+                .catch(error => {
+                    console.error('Search error:', error);
+                    if (error.response?.status === 401) {
+                        window.location.href = '/google/login';
+                    } else {
+                        alert('Error searching emails: ' + error.message);
+                    }
+                })
+                .finally(() => {
+                    showLoading(false);
+                });
+        }
+
+        function getRecentEmails() {
+            showLoading(true);
+            const params = {
+                days: document.getElementById('days').value,
+                processor: document.getElementById('processor').value
+            };
+
+            console.log('Recent emails params:', params);
+
+            axios.get('/api/v1/gmail/recent', { params })
+                .then(response => {
+                    console.log('Recent emails response:', response.data);
+                    displayEmails(response.data);
+                })
+                .catch(error => {
+                    console.error('Recent emails error:', error);
+                    if (error.response?.status === 401) {
+                        window.location.href = '/google/login';
+                    } else {
+                        alert('Error fetching recent emails: ' + error.message);
+                    }
+                })
+                .finally(() => {
+                    showLoading(false);
+                });
+        }
+
+        function logout() {
+            window.location.href = '/google/logout';
+        }
+    </script>
+</body>
+</html> 

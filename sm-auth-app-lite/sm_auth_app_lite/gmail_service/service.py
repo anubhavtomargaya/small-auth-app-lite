@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional, Set, Type, Union
 from datetime import datetime
 import logging
+import pandas as pd
 
 from .client import GmailClient
 from .processors.base import BaseProcessor
@@ -9,8 +10,9 @@ from .models.labels import GmailLabel
 from .processors.html import HTMLProcessor
 from .processors.regex import RegexProcessor
 from .models.query import EmailQuery
-
+from .processors.llm_processor import LLMProcessor
 from .exceptions import GmailServiceError
+from .services.clustering_service import ClusteringService
 
 class GmailService:
     """Service layer for Gmail operations and message processing"""
@@ -29,19 +31,24 @@ class GmailService:
     @classmethod
     def with_processor(cls, client: GmailClient, processor_type: str = 'html') -> 'GmailService':
         """Factory method to create service with specific processor type"""
+        processor = cls._get_processor(processor_type)
+        return cls(client, processor)
+
+    @staticmethod
+    def _get_processor(processor_type: str = 'html') -> BaseProcessor:
+        """Get the appropriate processor based on type"""
         processors = {
-            'html': HTMLProcessor,
-            'regex': RegexProcessor,
-            'base': BaseProcessor,
-            # Add more processors here
+            'html': HTMLProcessor(),
+            'regex': RegexProcessor(), 
+            'base': BaseProcessor(),
+            'llm': LLMProcessor()
         }
         
-        processor_class = processors.get(processor_type)
-        if not processor_class:
+        processor = processors.get(processor_type)
+        if not processor:
             raise ValueError(f"Unknown processor type: {processor_type}")
             
-        return cls(client, processor_class)
-
+        return processor
     def _get_label_mapping(self) -> Dict[str, str]:
         """Get or create mapping of label IDs to names"""
         if self._label_mapping is None:
@@ -131,7 +138,11 @@ class GmailService:
                     'labels': [label_mapping.get(label_id, label_id) for label_id in msg.labels]
                 } for msg in messages]
             
-            return self._process_messages(messages)
+            # Use process_all_emails for LLMProcessor, otherwise use _process_messages
+            if isinstance(self.processor, LLMProcessor):
+                return self.process_all_emails(messages)
+            else:
+                return self._process_messages(messages)
             
         except Exception as e:
             self._logger.error(f"Failed to search and process messages: {str(e)}")
@@ -172,4 +183,66 @@ class GmailService:
             
         except Exception as e:
             self._logger.error(f"Failed to fetch labels: {str(e)}")
-            raise GmailServiceError(f"Failed to fetch labels: {str(e)}") 
+            raise GmailServiceError(f"Failed to fetch labels: {str(e)}")
+
+    def process_all_emails(self, emails: List[EmailMessage]) -> List[Dict]:
+        """Process all emails and return processed results"""
+        try:
+            # Use the existing processor
+            if not isinstance(self.processor, LLMProcessor):
+                self._logger.warning("Processor is not LLMProcessor, switching to LLM processing")
+                processor = LLMProcessor()
+            else:
+                processor = self.processor
+
+            # Process all emails and create a list of dicts with necessary fields
+            processed_data = []
+            for email in emails:
+                result = processor.process(email)
+                if result:
+                    processed_data.append({
+                        'message_id': email.message_id,  # Get message_id from metadata
+                        'date': email.internal_date.isoformat() if email.internal_date else None,
+                        'content': result,
+                        'processor': self.processor.__class__.__name__,
+                        'labels': result.get('labels', [])
+                    })
+
+            # If no data was processed, return empty list
+            if not processed_data:
+                return []
+
+            # Convert to DataFrame
+            df = pd.DataFrame(processed_data)
+            
+            # Get embeddings from processor's store
+            embeddings_dict = getattr(processor, '_embeddings_store', {})
+            df['embedding'] = df['message_id'].map(embeddings_dict)
+
+            # Remove rows where embedding failed
+            df = df.dropna(subset=['embedding'])
+
+            # Check if we have enough data for clustering
+            if len(df) < 2:  # Need at least 2 points for meaningful clustering
+                self._logger.warning("Not enough data for clustering, returning with default categories")
+                return processed_data
+
+            # Run clustering on complete dataset
+            clustering_service = ClusteringService()
+            df_with_categories = clustering_service.process_embeddings(df)
+
+            # Drop embeddings column before returning results
+            df_with_categories = df_with_categories.drop('embedding', axis=1)
+
+            # Move category from top level to decoded_content
+            results = []
+            for record in df_with_categories.to_dict(orient='records'):
+                category = record.pop('category', 'D')  # Remove category from top level
+                record['content']['decoded_content']['category'] = category  # Put category in decoded_content
+                results.append(record)
+
+            return results
+            
+        except Exception as e:
+            self._logger.error(f"Failed to process all emails: {str(e)}")
+            raise GmailServiceError(f"Service error: {str(e)}") 
